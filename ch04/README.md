@@ -102,6 +102,6 @@ $ cdk destroy
 - 鍵は別管轄なので、`aws`コマンドで消す
 
 ```sh
-$ aws ec3 delete-key-pair --key-name 'HirakeGoma'
+$ aws ec2 delete-key-pair --key-name 'HirakeGoma'
 $ rm -f ~/.ssh/HirakeGoma.pem
 ```
