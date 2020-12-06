@@ -1,0 +1,107 @@
+from aws_cdk import (
+    core,
+    aws_ec2 as ec2,
+    aws_ecs as ecs,
+    aws_dynamodb as dynamodb,
+    aws_ssm as ssm,
+    aws_iam as iam,
+    aws_logs
+)
+
+
+class Ch08Stack(core.Stack):
+
+    def __init__(self, scope: core.Construct, construct_id: str, **kwargs) -> None:
+        super().__init__(scope, construct_id, **kwargs)
+
+        # 質問と回答を格納するテーブル
+        table = dynamodb.Table(
+            self, 'EcsClusterQaBot-Table',
+            partition_key=dynamodb.Attribute(
+                name='item_id', type=dynamodb.AttributeType.STRING
+            ),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+            removal_policy=core.RemovalPolicy.DESTROY
+        )
+
+        # VPC
+        vpc = ec2.Vpc(
+            self, "EcsClusterQaBot-Vpc",
+            max_azs=1,
+            subnet_configuration=[
+                ec2.SubnetConfiguration(
+                    name="public",
+                    subnet_type=ec2.SubnetType.PUBLIC,
+                )
+            ],
+            nat_gateways=0,
+        )
+
+        # ECS cluster
+        # ここに複数の仮想インスタンスを立てる
+        cluster = ecs.Cluster(
+            self, "EcsClusterQaBot-Cluster",
+            vpc=vpc,
+        )
+
+        # 実行するタスクの定義
+        # 指定されているマシンスペックは1タスクにつき1インスタンスで使用される値
+        taskdef = ecs.FargateTaskDefinition(
+            self, "EcsClusterQaBot-TaskDef",
+            cpu=1024, # 1 CPU
+            memory_limit_mib=4096, # 4GB RAM
+        )
+
+        # タスクに権限付与
+        table.grant_read_write_data(taskdef.task_role)
+        taskdef.add_to_task_role_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                resources=["*"],
+                actions=["ssm:GetParameter"]
+            )
+        )
+
+        # Docker imageの定義
+        container = taskdef.add_container(
+            "EcsClusterQaBot-Container",
+            image=ecs.ContainerImage.from_registry(
+                "registry.gitlab.com/tomomano/intro-aws/handson03:latest"
+            ),
+            logging=ecs.LogDrivers.aws_logs(
+                stream_prefix="EcsClusterQaBot",
+                log_retention=aws_logs.RetentionDays.ONE_DAY
+            ),
+        )
+
+        # Store parameters in SSM
+        ssm.StringParameter(
+            self, "ECS_CLUSTER_NAME",
+            parameter_name="ECS_CLUSTER_NAME",
+            string_value=cluster.cluster_name,
+        )
+        ssm.StringParameter(
+            self, "ECS_TASK_DEFINITION_ARN",
+            parameter_name="ECS_TASK_DEFINITION_ARN",
+            string_value=taskdef.task_definition_arn
+        )
+        ssm.StringParameter(
+            self, "ECS_TASK_VPC_SUBNET_1",
+            parameter_name="ECS_TASK_VPC_SUBNET_1",
+            string_value=vpc.public_subnets[0].subnet_id
+        )
+        ssm.StringParameter(
+            self, "CONTAINER_NAME",
+            parameter_name="CONTAINER_NAME",
+            string_value=container.container_name
+        )
+        ssm.StringParameter(
+            self, "TABLE_NAME",
+            parameter_name="TABLE_NAME",
+            string_value=table.table_name
+        )
+
+        core.CfnOutput(self, "ClusterName", value=cluster.cluster_name)
+        core.CfnOutput(self, "TaskDefinitionArn", value=taskdef.task_definition_arn)
+
+
