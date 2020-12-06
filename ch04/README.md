@@ -1,58 +1,107 @@
+# Hands-on 1: 初めてのEC2インスタンスを起動する
 
-# Welcome to your CDK Python project!
+## 利用するサービスの説明
 
-This is a blank project for Python development with CDK.
+### VPC
+- AWS上にプライベートな仮想ネットワーク環境を構築するツール。
+- EC2インスタンスが1つだけであったとしてもVPCは必ず1つは用意しなければならない
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
-
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
-
-To manually create a virtualenv on MacOS and Linux:
-
-```
-$ python3 -m venv .venv
-```
-
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
-
-```
-$ source .venv/bin/activate
+```python
+vpc = ec2.Vpc(
+    self, "MyFirstEc2-Vpc",
+    max_azs=1,  # availability zone = 1  特にデータセンターの障害を気にする必要がない設定
+    cidr="10.10.0.0/23",  # IPv4のレンジ指定。10.10.0.0 ~ 10.10.1.255までのアドレス範囲を表している。256 * 2 = 512個のユニークなIPv4アドレスを作成することになる。いくら作成しても無料
+    subnet_configuration=[
+        ec2.SubnetConfiguration(
+            name="public",
+            subnet_type=ec2.SubnetType.PUBLIC, # 外部から通信したいのでpublic。セキュリティ的な問題からEC2インスタンスなどはprivateにする
+        )
+    ],
+    nat_gateways=0,  # 外部のネットワークと通信する必要がある場合は1以上にする。0だと課金されない
+)
 ```
 
-If you are a Windows platform, you would activate the virtualenv like this:
+### Security Group
+- EC2インスタンスに付与できる仮想ファイアウォール
+- 特定IPからの通信を許可、禁止などができる
 
-```
-% .venv\Scripts\activate.bat
-```
-
-Once the virtualenv is activated, you can install the required dependencies.
-
-```
-$ pip install -r requirements.txt
-```
-
-At this point you can now synthesize the CloudFormation template for this code.
-
-```
-$ cdk synth
+```python
+sg = ec2.SecurityGroup(
+    self, "MyFirstEc2Vpc-Sg",
+    vpc=vpc,
+    allow_all_outbound=True,  # VPCネットワークからの外部通信を許可
+)
+sg.add_ingress_rule(
+    peer=ec2.Peer.any_ipv4(),  # 全てのIPv4ネットワークから22ポートへのアクセスを許可
+    connection=ec2.Port.tcp(22),
+)
 ```
 
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
+### EC2(Elastic Compute Cloud)
+- 仮想サーバーを立ち上げるサービス
 
-## Useful commands
+```python
+host = ec2.Instance(
+    self, "MyFirstEc2Instance",
+    instance_type=ec2.InstanceType("t2.micro"),  # t2.micro
+    machine_image=ec2.MachineImage.latest_amazon_linux(),  # OS: amazon_linux
+    vpc=vpc,
+    vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
+    security_group=sg,
+    key_name=key_name
+)
+```
 
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
+## デプロイ方法
 
-Enjoy!
+### AWSのシークレットキーをセット
+
+```sh
+$ export AWS_ACCESS_KEY_ID=***
+$ export AWS_SECRET_ACCESS_KEY=***
+$ export AWS_DEFAULT_REGION=ap-northeast-1
+```
+
+
+### ssh鍵を作成
+
+```sh
+$ export KEY_NAME='HirakeGoma'
+$ aws ec2 create-key-pair --key-name ${KEY_NAME} --query 'KeyMaterial' --output text > ${KEY_NAME}.pem
+$ chmod 400 HirakeGoma.pem
+$ mv HirakeGoma.pem ~/.ssh/
+$ chmod 400 ~/.ssh/HirakeGoma.pem
+```
+
+### デプロイの実行
+
+```sh
+$ cdk deploy -c key_name="HirakeGoma" # wait a minutes...
+```
+
+### sshによる接続
+
+- 22ポートはパブリックネットワークに繋がっているため、sshで接続できる
+
+```sh
+$ ssh -i ~/.ssh/HirakeGoma.pem ec2-user@<IP Address>
+```
+
+## AWSコンソールによるリソースの確認
+
+- `CloudFormation`から今回デプロイしたリソースを確認することができる
+
+## リソースの削除
+
+- `cdk`で管理されているので、このコマンドから簡単に消すことができる
+
+```sh
+$ cdk destroy
+```
+
+- 鍵は別管轄なので、`aws`コマンドで消す
+
+```sh
+$ aws ec3 delete-key-pair --key-name 'HirakeGoma'
+$ rm -f ~/.ssh/HirakeGoma.pem
+```
