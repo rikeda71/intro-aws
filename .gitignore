@@ -15,3 +15,4 @@
 vendor/
 
 cdk.out/
+.venv/
