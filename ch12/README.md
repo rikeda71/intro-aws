@@ -1,58 +1,20 @@
+# 12. Hands-on 5: Bashoutter
 
-# Welcome to your CDK Python project!
+## s3のpublic access mode
+- public access modeをオンにすると、バケットの中のファイルは基本的に認証なしで誰でも閲覧できるようになる。
+- URLは`http://xxx.s3-website-ap-northeast-1.amazonaws.com/`のような形式
+- サーブされるファイルは `website_index_document`パラメタで指定できる。ここにhtmlファイルを渡せばいい
 
-This is a blank project for Python development with CDK.
+### CloudFront
+- より本格的なウェブページをs3を使って運用する場合に追加するべきサービス
+- CloudFrontには`Content Delivery Network(CDN)`と言う機能が備わっている。CDNは頻繁にアクセスされるデータをメモリにキャッシュしておくことで、クライアントがキャッシュを使ってページへのアクセスができるようになる
+- CloudFrontを使うことで、HTTPS通信を設定することもできるので必須
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+### API Gateway
+- APIの入り口として、APIのリクエストパスに従って、lambda関数などに接続を行う役割を担う。
+- 一般的なサーバーにおけるルーターの役割を担う（つまり、サーバーレスのルーターとも言える）
+- APIリクエストが来た時のみ起動し、APIが来ていない時は完全にシャットダウンしている。
+- 一秒間に1000~10000オーダーのAPIリクエストを捌くことができるシステムを用意に構築できる。
+- 月ごとに1,000,000件のリクエストまでを0円で捌くことができるため有用
 
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
 
-To manually create a virtualenv on MacOS and Linux:
-
-```
-$ python3 -m venv .venv
-```
-
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
-
-```
-$ source .venv/bin/activate
-```
-
-If you are a Windows platform, you would activate the virtualenv like this:
-
-```
-% .venv\Scripts\activate.bat
-```
-
-Once the virtualenv is activated, you can install the required dependencies.
-
-```
-$ pip install -r requirements.txt
-```
-
-At this point you can now synthesize the CloudFormation template for this code.
-
-```
-$ cdk synth
-```
-
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
-
-## Useful commands
-
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
-
-Enjoy!
