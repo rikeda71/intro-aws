@@ -27,11 +27,11 @@ class Ch12Stack(core.Stack):
         # 続いて、静的コンテンツを配信するためのS3バケットを用意
         bucket = s3.Bucket(
             self, 'Bashoutter-Bucket',
-            sebsite_index_document='index.html'
+            website_index_document='index.html',
             public_read_access=True,
             removal_policy=core.RemovalPolicy.DESTROY
         )
-        s3_deploy.BuckeetDeployment(
+        s3_deploy.BucketDeployment(
             self, 'BucketDeployment',
             destination_bucket=bucket,
             sources=[s3_deploy.Source.asset('./gui/dist')],
